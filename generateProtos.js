@@ -121,35 +121,42 @@ function generateProtoFiles(descriptors) {
     fs.mkdirSync(protoDir);
   }
 
-  const protoContent = `
+  Object.keys(descriptors).forEach((key) => {
+    const dirPath = path.resolve(protoDir, key);
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath);
+    }
+
+    const descriptor = descriptors[key];
+    if (typeof descriptor === 'object' && !Array.isArray(descriptor)) {
+      Object.keys(descriptor).forEach((subKey) => {
+        const filePath = path.resolve(dirPath, `${subKey}.proto`);
+        const content = generateProtoContent(key, descriptor[subKey]);
+        fs.writeFileSync(filePath, content);
+        console.log(`Generated proto file: ${filePath}`);
+      });
+    } else {
+      const filePath = path.resolve(dirPath, `${key}.proto`);
+      const content = generateProtoContent(key, descriptor);
+      fs.writeFileSync(filePath, content);
+      console.log(`Generated proto file: ${filePath}`);
+    }
+  });
+}
+
+function generateProtoContent(type, descriptor) {
+  const content = `
     syntax = "proto3";
     package cosmos.base.reflection.v1beta1;
 
-    // Auto-generated proto files based on reflection service descriptors
-    message ListAllInterfacesResponse {
-      repeated string interface_names = 1;
+    // Auto-generated proto file for ${type}
+    message ${type} {
+      ${Object.entries(descriptor)
+        .map(([key, value], index) => `repeated ${typeof value === 'object' ? 'message' : typeof value} ${key} = ${index + 1};`)
+        .join('\n      ')}
     }
-
-    message ListImplementationsResponse {
-      repeated string implementation_message_names = 1;
-    }
-
-    message GetAuthnDescriptorResponse {}
-
-    message GetChainDescriptorResponse {}
-
-    message GetCodecDescriptorResponse {}
-
-    message GetConfigurationDescriptorResponse {}
-
-    message GetQueryServicesDescriptorResponse {}
-
-    message GetTxDescriptorResponse {}
   `;
-
-  const filePath = path.resolve(protoDir, 'reflection.proto');
-  fs.writeFileSync(filePath, protoContent);
-  console.log(`Generated proto file: ${filePath}`);
+  return content;
 }
 
 async function generateTarball() {
