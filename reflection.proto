@@ -3,6 +3,7 @@ syntax = "proto3";
 package cosmos.base.reflection.v1beta1;
 
 import "google/api/annotations.proto";
+import "gogoproto/gogo.proto";
 
 option go_package = "github.com/cosmos/cosmos-sdk/server/grpc/reflection/v1beta1";
 
@@ -21,22 +22,22 @@ service ReflectionService {
 
   // Extended Cosmos SDK reflection (v2alpha1)
   rpc GetAuthnDescriptor(GetAuthnDescriptorRequest) returns (GetAuthnDescriptorResponse) {
-    option (google.api.http).get = "/cosmos/base/reflection/v1beta1/app_descriptor/authn";
+    option (google.api.http).get = "/cosmos/base/reflection/v2alpha1/app_descriptor/authn";
   }
   rpc GetChainDescriptor(GetChainDescriptorRequest) returns (GetChainDescriptorResponse) {
-    option (google.api.http).get = "/cosmos/base/reflection/v1beta1/app_descriptor/chain";
+    option (google.api.http).get = "/cosmos/base/reflection/v2alpha1/app_descriptor/chain";
   }
   rpc GetCodecDescriptor(GetCodecDescriptorRequest) returns (GetCodecDescriptorResponse) {
-    option (google.api.http).get = "/cosmos/base/reflection/v1beta1/app_descriptor/codec";
+    option (google.api.http).get = "/cosmos/base/reflection/v2alpha1/app_descriptor/codec";
   }
   rpc GetConfigurationDescriptor(GetConfigurationDescriptorRequest) returns (GetConfigurationDescriptorResponse) {
-    option (google.api.http).get = "/cosmos/base/reflection/v1beta1/app_descriptor/configuration";
+    option (google.api.http).get = "/cosmos/base/reflection/v2alpha1/app_descriptor/configuration";
   }
   rpc GetQueryServicesDescriptor(GetQueryServicesDescriptorRequest) returns (GetQueryServicesDescriptorResponse) {
-    option (google.api.http).get = "/cosmos/base/reflection/v1beta1/app_descriptor/query_services";
+    option (google.api.http).get = "/cosmos/base/reflection/v2alpha1/app_descriptor/query_services";
   }
   rpc GetTxDescriptor(GetTxDescriptorRequest) returns (GetTxDescriptorResponse) {
-    option (google.api.http).get = "/cosmos/base/reflection/v1beta1/app_descriptor/tx_descriptor";
+    option (google.api.http).get = "/cosmos/base/reflection/v2alpha1/app_descriptor/tx_descriptor";
   }
 }
 

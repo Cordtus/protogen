@@ -1,65 +1,70 @@
-# Protogen
+# Cosmos SDK gRPC Proto Generator
 
-Protogen is a Node.js application that generates `.proto` files based on the descriptors provided by a gRPC reflection service. The generated `.proto` files can be exported as a `.tar.gz` archive for easy transport.
+This tool generates comprehensive proto files for Cosmos SDK-based chains using various reflection methods.
 
-## Features
+## Setup
 
-- Interactively query a gRPC reflection service to generate `.proto` files.
-- Handles methods that are not implemented and reports missing methods.
-- Exports generated `.proto` files into a `.tar.gz` archive.
+1. Clone this repository:
+   ```
+   git clone https://github.com/your-username/cosmos-sdk-grpc-proto-generator.git
+   cd cosmos-sdk-grpc-proto-generator
+   ```
 
-## Prerequisites
+2. Install dependencies:
+   ```
+   npm install
+   ```
 
-- Node.js (v14.x or later)
-- Yarn package manager
+3. Create a `proto_includes` directory in the project root:
+   ```
+   mkdir proto_includes
+   ```
 
-## Installation
+4. Clone the following repositories into the `proto_includes` directory:
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/protogen.git
-cd protogen
-```
+   a. Google APIs:
+   ```
+   git clone https://github.com/googleapis/googleapis.git proto_includes/googleapis
+   ```
 
-2. Install the dependencies:
-```bash
-yarn install
-```
+   b. Protocol Buffers:
+   ```
+   git clone https://github.com/protocolbuffers/protobuf.git proto_includes/protobuf
+   ```
+
+   c. Cosmos SDK:
+   ```
+   git clone https://github.com/cosmos/cosmos-sdk.git proto_includes/cosmos-sdk
+   ```
+
+   d. Gogo Protobuf:
+   ```
+   git clone https://github.com/gogo/protobuf.git proto_includes/gogo-protobuf
+   ```
+
+5. Ensure you have the `reflection.proto` file in the root directory of the project. This file combines standard gRPC reflection, Cosmos SDK custom reflection, and extended Cosmos SDK reflection (v2alpha1) methods.
 
 ## Usage
 
-1. Run the script:
-```bash
+Run the script:
+```
 node generateProtos.js
 ```
 
-2. Follow the prompts:
-   - Enter the gRPC endpoint.
-   - Select the connection type (plaintext or TLS).
-   - Choose whether to generate a `.tar.gz` file for the `.proto` files.
-
-## Example
-
-```
-? Enter the gRPC endpoint: sei.grpc.kjnodes.com:443
-? Select connection type: TLS
-? Do you want to generate a .tar.gz file for the .proto files? (Y/n) Y
-```
+Follow the prompts to enter the gRPC endpoint and other options.
 
 ## Output
 
-- The generated `.proto` files will be saved in the `generated_protos` directory.
-- If opted, a `.tar.gz` archive of the `generated_protos` directory will be created as `generated_protos.tar.gz`.
+The script will generate proto files in the `generated_protos` directory. If selected, it will also create a tarball of these files.
 
-## Error Handling
+## Note
 
-The script will handle methods that are not implemented by the reflection service and will report them at the end of the execution.
+The `proto_includes` directory is included in the `.gitignore` file due to its size and to reduce unnecessary redundant code storage. If you're cloning this repository, make sure to follow the setup instructions to populate the `proto_includes` directory.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a pull request or open an issue.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License.
-
+[MIT License](LICENSE)
