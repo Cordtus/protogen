@@ -10,9 +10,9 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PROTO_PATH = path.resolve(__dirname, './reflection.proto');
+const REFLECTION_PROTO_PATH = path.resolve(__dirname, './reflection.proto');
 
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+const packageDefinition = protoLoader.loadSync(REFLECTION_PROTO_PATH, {
   keepCase: true,
   longs: String,
   enums: String,
@@ -21,7 +21,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 });
 
 const protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
-const ReflectionService = protoDescriptor.cosmos.base.reflection.v1beta1.ReflectionService;
+const ReflectionService = protoDescriptor.grpc.reflection.v1alpha.ServerReflection;
 
 async function promptUser() {
   const questions = [
@@ -49,73 +49,98 @@ async function promptUser() {
   return inquirer.prompt(questions);
 }
 
-async function callMethod(client, methodName, request = {}) {
+async function getServiceList(client) {
   return new Promise((resolve, reject) => {
-    if (typeof client[methodName] !== 'function') {
-      reject(new Error(`Method ${methodName} not found`));
-      return;
-    }
-    client[methodName](request, (error, response) => {
-      if (error) {
-        console.warn(`Warning: ${methodName} failed:`, error.message);
-        resolve(null);
-      } else {
-        resolve(response);
+    const call = client.ServerReflectionInfo();
+    call.write({ list_services: '' });
+    call.on('data', (response) => {
+      if (response.list_services_response) {
+        resolve(response.list_services_response.service);
       }
     });
+    call.on('error', reject);
+    call.end();
   });
+}
+
+async function getServiceDescriptor(client, serviceName) {
+  return new Promise((resolve, reject) => {
+    const call = client.ServerReflectionInfo();
+    call.write({ file_containing_symbol: serviceName });
+    call.on('data', (response) => {
+      if (response.file_descriptor_response) {
+        resolve(response.file_descriptor_response.file_descriptor_proto);
+      }
+    });
+    call.on('error', reject);
+    call.end();
+  });
+}
+
+function parseFileDescriptor(fileDescriptorProto) {
+  const FileDescriptorProto = protoDescriptor.google.protobuf.FileDescriptorProto;
+  const descriptor = FileDescriptorProto.decode(Buffer.from(fileDescriptorProto[0], 'base64'));
+  return descriptor;
 }
 
 async function generateProtoFiles(client) {
   const protoDir = path.resolve(__dirname, 'generated_protos');
   await fs.mkdir(protoDir, { recursive: true });
 
-  const interfaces = await callMethod(client, 'ListAllInterfaces');
-  if (interfaces && interfaces.interface_names) {
-    for (const interfaceName of interfaces.interface_names) {
-      const implementations = await callMethod(client, 'ListImplementations', { interface_name: interfaceName });
-      if (implementations && implementations.implementation_message_names) {
-        await generateProtoFile(interfaceName, implementations.implementation_message_names);
-      }
-    }
+  const services = await getServiceList(client);
+  
+  for (const service of services) {
+    const fileDescriptorProto = await getServiceDescriptor(client, service.name);
+    const descriptor = parseFileDescriptor(fileDescriptorProto);
+    await generateProtoFile(descriptor, service.name);
   }
 
   await generateCommonProtoFiles();
 }
 
-async function generateProtoFile(interfaceName, implementations) {
-  const parts = interfaceName.split('.');
-  const packageName = parts.slice(0, -1).join('.');
-  const serviceName = parts[parts.length - 1];
-  const fileName = `${serviceName.toLowerCase()}.proto`;
-  const dirPath = path.resolve(__dirname, 'generated_protos', ...parts.slice(0, -1));
+async function generateProtoFile(descriptor, serviceName) {
+  const packageName = descriptor.package;
+  const fileName = serviceName.split('.').pop().toLowerCase() + '.proto';
+  const dirPath = path.resolve(__dirname, 'generated_protos', ...packageName.split('.'));
   
   await fs.mkdir(dirPath, { recursive: true });
   
   let content = `syntax = "proto3";\n\n`;
   content += `package ${packageName};\n\n`;
-  content += `import "google/protobuf/any.proto";\n\n`;
+  content += `import "google/api/annotations.proto";\n`;
+  content += `import "gogoproto/gogo.proto";\n`;
+  content += `import "cosmos/base/query/v1beta1/pagination.proto";\n\n`;
   content += `option go_package = "github.com/cosmos/cosmos-sdk/${packageName}";\n\n`;
   
-  content += `// ${serviceName} defines the gRPC service for the ${parts.slice(0, -1).join(' ')} module.\n`;
-  content += `service ${serviceName} {\n`;
-  
-  for (const impl of implementations) {
-    const methodName = impl.split('.').pop();
-    content += `  // ${methodName} defines a method for the ${serviceName} service.\n`;
-    content += `  rpc ${methodName}(${methodName}Request) returns (${methodName}Response);\n\n`;
+  // Add service definition
+  const service = descriptor.service.find(s => s.name === serviceName.split('.').pop());
+  if (service) {
+    content += `// ${service.name} defines the gRPC queries for the ${packageName} module.\n`;
+    content += `service ${service.name} {\n`;
+    for (const method of service.method) {
+      content += `  rpc ${method.name} (${method.input_type.split('.').pop()}) returns (${method.output_type.split('.').pop()}) {\n`;
+      content += `    option (google.api.http) = {\n      // HTTP binding to be filled\n    };\n`;
+      content += `  }\n\n`;
+    }
+    content += `}\n\n`;
   }
-  
-  content += `}\n\n`;
-  
-  for (const impl of implementations) {
-    const methodName = impl.split('.').pop();
-    content += `// ${methodName}Request defines the request structure for the ${methodName} gRPC method.\n`;
-    content += `message ${methodName}Request {}\n\n`;
-    content += `// ${methodName}Response defines the response structure for the ${methodName} gRPC method.\n`;
-    content += `message ${methodName}Response {\n`;
-    content += `  // response field placeholder\n`;
-    content += `  google.protobuf.Any result = 1;\n`;
+
+  // Add message definitions
+  for (const message of descriptor.message_type) {
+    content += `message ${message.name} {\n`;
+    for (const [index, field] of message.field.entries()) {
+      const fieldType = field.type_name ? field.type_name.split('.').pop() : field.type.toLowerCase();
+      content += `  ${fieldType} ${field.name} = ${index + 1}`;
+      if (field.options) {
+        const options = [];
+        if (field.options.deprecated) options.push('deprecated = true');
+        if (field.options['.gogoproto.nullable'] === false) options.push('(gogoproto.nullable) = false');
+        if (options.length > 0) {
+          content += ` [${options.join(', ')}]`;
+        }
+      }
+      content += `;\n`;
+    }
     content += `}\n\n`;
   }
   
@@ -126,36 +151,54 @@ async function generateProtoFile(interfaceName, implementations) {
 
 async function generateCommonProtoFiles() {
   const commonProtos = {
-    'google/protobuf/any.proto': `
+    'google/api/annotations.proto': `
 syntax = "proto3";
 
-package google.protobuf;
+package google.api;
 
-option go_package = "github.com/golang/protobuf/ptypes/any";
+import "google/api/http.proto";
+import "google/protobuf/descriptor.proto";
 
-// Any contains an arbitrary serialized protocol buffer message along with a
-// URL that describes the type of the serialized message.
-message Any {
-  // A URL/resource name that uniquely identifies the type of the serialized
-  // protocol buffer message.
-  string type_url = 1;
+option go_package = "google.golang.org/genproto/googleapis/api/annotations;annotations";
 
-  // Must be a valid serialized protocol buffer of the above specified type.
-  bytes value = 2;
+extend google.protobuf.MethodOptions {
+  // See HttpRule for details.
+  HttpRule http = 72295728;
 }
     `.trim(),
     
-    'cosmos/base/v1beta1/coin.proto': `
+    'cosmos/base/query/v1beta1/pagination.proto': `
 syntax = "proto3";
 
-package cosmos.base.v1beta1;
+package cosmos.base.query.v1beta1;
 
-option go_package = "github.com/cosmos/cosmos-sdk/types";
+option go_package = "github.com/cosmos/cosmos-sdk/types/query";
 
-// Coin defines a token with a denomination and an amount.
-message Coin {
-  string denom = 1;
-  string amount = 2;
+// PageRequest is to be embedded in gRPC request messages for efficient pagination.
+message PageRequest {
+  // key is a value returned in PageResponse.next_key to begin querying the next page.
+  bytes key = 1;
+
+  // offset is a numeric offset that can be used when key is unavailable.
+  uint64 offset = 2;
+
+  // limit is the total number of results to be returned in the result page.
+  uint64 limit = 3;
+
+  // count_total is set to true to indicate that the result set should include a count of the total number of items available.
+  bool count_total = 4;
+
+  // reverse is set to true if results are to be returned in the descending order.
+  bool reverse = 5;
+}
+
+// PageResponse is to be embedded in gRPC response messages where the corresponding request message has used PageRequest.
+message PageResponse {
+  // next_key is the key to be passed to PageRequest.key to query the next page.
+  bytes next_key = 1;
+
+  // total is total number of results available if PageRequest.count_total was set, its value is undefined otherwise.
+  uint64 total = 2;
 }
     `.trim(),
   };
