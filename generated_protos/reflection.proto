@@ -1,0 +1,25 @@
+
+    syntax = "proto3";
+    package cosmos.base.reflection.v1beta1;
+
+    // Auto-generated proto files based on reflection service descriptors
+    message ListAllInterfacesResponse {
+      repeated string interface_names = 1;
+    }
+
+    message ListImplementationsResponse {
+      repeated string implementation_message_names = 1;
+    }
+
+    message GetAuthnDescriptorResponse {}
+
+    message GetChainDescriptorResponse {}
+
+    message GetCodecDescriptorResponse {}
+
+    message GetConfigurationDescriptorResponse {}
+
+    message GetQueryServicesDescriptorResponse {}
+
+    message GetTxDescriptorResponse {}
+  

@@ -1,0 +1,13 @@
+{
+  "name": "protogen",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.11.1",
+    "@grpc/proto-loader": "^0.7.13",
+    "inquirer": "^10.1.2",
+    "tar": "^7.4.1"
+  }
+}
