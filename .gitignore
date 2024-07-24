@@ -1,6 +1,9 @@
 /logs
 /node_modules
+/generated_protos
 .env
 *.log
 *.txt
+*.tar.gz
 .DS_Store
+
